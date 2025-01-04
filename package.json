@@ -28,7 +28,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "prepare": "ts-patch install && typia patch",
+    "prepare": "ts-patch install && typia patch && npm run build",
     "format": "npx @biomejs/biome check . --write",
     "build": "tsup",
     "dev": "tsup --watch"
