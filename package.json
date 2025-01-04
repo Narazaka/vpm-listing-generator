@@ -37,6 +37,9 @@
   "author": "narazaka",
   "license": "Zlib",
   "description": "",
+  "engines": {
+    "node": ">=16"
+  },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@ryoppippi/unplugin-typia": "^1.1.0",
