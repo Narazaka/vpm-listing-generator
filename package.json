@@ -1,9 +1,37 @@
 {
   "name": "vpm-listing-generator",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./*": {
+      "import": {
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.js"
+      },
+      "require": {
+        "types": "./dist/*.d.cts",
+        "default": "./dist/*.cjs"
+      }
+    }
+  },
+  "sideEffects": false,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prepare": "ts-patch install && typia patch",
+    "format": "npx @biomejs/biome check . --write",
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "keywords": [],
   "author": "narazaka",
@@ -11,6 +39,12 @@
   "description": "",
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "typescript": "^5.7.2"
+    "@ryoppippi/unplugin-typia": "^1.1.0",
+    "ts-patch": "^3.3.0",
+    "tsup": "^8.3.5",
+    "typescript": "~5.7.2"
+  },
+  "dependencies": {
+    "typia": "^7.5.1"
   }
 }
