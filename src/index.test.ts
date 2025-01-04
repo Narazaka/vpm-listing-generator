@@ -71,7 +71,6 @@ test("generate", { timeout: 1000 * 60 * 30 }, async () => {
   const listing = generate(source, {
     octokit,
     logger: console.log,
-    calcSHA256: false,
   });
   expect(listing).resolves.toBeDefined();
 });
