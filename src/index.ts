@@ -10,12 +10,18 @@ const assertListing = /*#__PURE__*/ typia.createAssert<Listing>();
 
 export async function generate(
   source: Source,
-  octokit: Octokit,
+  options: {
+    octokit: Octokit;
+    logger?: (message: string) => unknown;
+  },
 ): Promise<Listing> {
+  const { octokit, logger } = options;
+  const log = logger ?? (() => {});
   assertSource(source);
   const githubRepos = source.githubRepos ?? [];
   const packages: Listing["packages"] = {};
   for (const githubRepo of githubRepos) {
+    log(`--- Fetching releases from [${githubRepo}]`);
     const [owner, repo] = githubRepo.split("/");
     const releases = await octokit.paginate(octokit.rest.repos.listReleases, {
       owner,
@@ -27,7 +33,15 @@ export async function generate(
       const packageJson = release.assets.find(
         (asset) => asset.name === "package.json",
       );
-      if (!packageJson) continue;
+      if (!packageJson) {
+        log(
+          `[${githubRepo}](${release.name}) Skipping release because it does not contain package.json`,
+        );
+        continue;
+      }
+      log(
+        `[${githubRepo}](${release.name}) Fetching package.json from ${packageJson.browser_download_url}`,
+      );
       const pkg = await fetchPackageJson(packageJson.browser_download_url);
       packageId = pkg.name;
       const zipName = `${pkg.name}-${pkg.version}.zip`;
@@ -37,10 +51,14 @@ export async function generate(
           `Failed to find zip file ${zipName} in release ${githubRepo} ${release.name}`,
         );
       }
+      log(
+        `[${githubRepo}](${release.name}) \"${zipName}\" Fetching zip file from ${zip.browser_download_url}`,
+      );
+      const zipSHA256 = await fetchZipSHA256(zip.browser_download_url);
       versions[pkg.version] = {
         ...pkg,
         url: zip.browser_download_url,
-        zipSHA256: await fetchZipSHA256(zip.browser_download_url),
+        zipSHA256,
       };
     }
     if (!packageId) continue;
