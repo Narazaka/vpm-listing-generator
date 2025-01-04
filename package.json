@@ -43,12 +43,12 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@ryoppippi/unplugin-typia": "^1.1.0",
+    "octokit": "^4.0.3",
     "ts-patch": "^3.3.0",
     "tsup": "^8.3.5",
     "typescript": "~5.7.2"
   },
   "dependencies": {
-    "octokit": "^4.0.3",
     "typia": "^7.5.1"
   }
 }
