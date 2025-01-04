@@ -70,7 +70,7 @@ test(
   "generate",
   { timeout: 1000 * 60 * 30 },
   async () => {
-    const octokit = new Octokit();
+    const octokit = new Octokit({auth: process.env.GITHUB_TOKEN});
     const listing = generate(source, { octokit, logger: console.log, calcSHA256: false });
     expect(listing).resolves.toBeDefined();
   },
