@@ -3,19 +3,22 @@ import typia from "typia";
 import type { Listing } from "./Listing.js";
 import type { Package } from "./Package.js";
 import type { Source } from "./Source.js";
+import type { StrictPackage } from "./StrictPackage.js";
 
 const assertSource = /*#__PURE__*/ typia.createAssert<Source>();
 const assertPackage = /*#__PURE__*/ typia.createAssert<Package>();
+const assertStrictPackage = /*#__PURE__*/ typia.createAssert<StrictPackage>();
 const assertListing = /*#__PURE__*/ typia.createAssert<Listing>();
 
 export async function generate(
   source: Source,
   options: {
     octokit: Octokit;
+    calcSHA256?: boolean;
     logger?: (message: string) => unknown;
   },
 ): Promise<Listing> {
-  const { octokit, logger } = options;
+  const { octokit, logger, calcSHA256 = true } = options;
   const log = logger ?? (() => {});
   assertSource(source);
   const githubRepos = source.githubRepos ?? [];
@@ -51,15 +54,25 @@ export async function generate(
           `Failed to find zip file ${zipName} in release ${githubRepo} ${release.name}`,
         );
       }
-      log(
-        `[${githubRepo}](${release.name}) \"${zipName}\" Fetching zip file from ${zip.browser_download_url}`,
+      let zipSHA256: undefined | string;
+      if (calcSHA256) {
+        log(
+          `[${githubRepo}](${release.name}) \"${zipName}\" Fetching zip file from ${zip.browser_download_url}`,
+        );
+        zipSHA256 = await fetchZipSHA256(zip.browser_download_url);
+      }
+      versions[pkg.version] = assertStrictPackage(
+        zipSHA256
+          ? {
+              ...pkg,
+              url: zip.browser_download_url,
+              zipSHA256,
+            }
+          : {
+              ...pkg,
+              url: zip.browser_download_url,
+            },
       );
-      const zipSHA256 = await fetchZipSHA256(zip.browser_download_url);
-      versions[pkg.version] = {
-        ...pkg,
-        url: zip.browser_download_url,
-        zipSHA256,
-      };
     }
     if (!packageId) continue;
     packages[packageId] = { versions };

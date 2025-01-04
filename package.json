@@ -31,7 +31,9 @@
     "prepare": "ts-patch install && typia patch && npm run build",
     "format": "npx @biomejs/biome check . --write",
     "build": "tsup",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "narazaka",
@@ -46,7 +48,8 @@
     "octokit": "^4.0.3",
     "ts-patch": "^3.3.0",
     "tsup": "^8.3.5",
-    "typescript": "~5.7.2"
+    "typescript": "~5.7.2",
+    "vitest": "2.1.2"
   },
   "dependencies": {
     "typia": "^7.5.1"
