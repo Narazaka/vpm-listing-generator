@@ -4,11 +4,24 @@ import type { Listing } from "./Listing.js";
 import type { Package } from "./Package.js";
 import type { Source } from "./Source.js";
 import type { StrictPackage } from "./StrictPackage.js";
+import PQueue from 'p-queue';
 
 const assertSource = /*#__PURE__*/ typia.createAssert<Source>();
 const assertPackage = /*#__PURE__*/ typia.createAssert<Package>();
 const assertStrictPackage = /*#__PURE__*/ typia.createAssert<StrictPackage>();
 const assertListing = /*#__PURE__*/ typia.createAssert<Listing>();
+
+type PromiseValue<T> = T extends Promise<infer V> ? V : never;
+
+function genFetchReleases(octokit: Octokit) {
+  return function fetchReleases(githubRepo: string) {
+    const [owner, repo] = githubRepo.split("/");
+    return octokit.paginate(octokit.rest.repos.listReleases, {
+      owner,
+      repo,
+    });
+  }
+}
 
 export async function generate(
   source: Source,
@@ -18,21 +31,33 @@ export async function generate(
     logger?: (message: string) => unknown;
   },
 ): Promise<Listing> {
+  assertSource(source);
+
   const { octokit, logger, calcSHA256 = true } = options;
   const log = logger ?? (() => {});
-  assertSource(source);
   const githubRepos = source.githubRepos ?? [];
   const packages: Listing["packages"] = {};
+
+  const fetchReleases = genFetchReleases(octokit);
+  const allReleases: {[name: string]: PromiseValue<ReturnType<typeof fetchReleases>>} = {};
   for (const githubRepo of githubRepos) {
-    log(`--- Fetching releases from [${githubRepo}]`);
+    log(`Fetching releases from [${githubRepo}]`);
     const [owner, repo] = githubRepo.split("/");
     const releases = await octokit.paginate(octokit.rest.repos.listReleases, {
       owner,
       repo,
     });
+    allReleases[githubRepo] = releases;
+  }
+
+  const fetchQueue = new PQueue({ concurrency: 5 });
+
+  await Promise.all(githubRepos.map(async (githubRepo) => {
+    log(`--- Fetching package info from [${githubRepo}]`);
+    const releases = allReleases[githubRepo];
     let packageId = "";
     const versions: Listing["packages"][string]["versions"] = {};
-    for (const release of releases) {
+    await Promise.all(releases.map(async (release) => {
       const packageJson = release.assets.find(
         (asset) => asset.name === "package.json",
       );
@@ -40,12 +65,14 @@ export async function generate(
         log(
           `[${githubRepo}](${release.name}) Skipping release because it does not contain package.json`,
         );
-        continue;
+        return;
       }
       log(
         `[${githubRepo}](${release.name}) Fetching package.json from ${packageJson.browser_download_url}`,
       );
-      const pkg = await fetchPackageJson(packageJson.browser_download_url);
+      
+      const pkg = await fetchQueue.add(() => fetchPackageJson(packageJson.browser_download_url));
+      if (!pkg) throw new Error("Failed to fetch package.json");
       packageId = pkg.name;
       const zipName = `${pkg.name}-${pkg.version}.zip`;
       const zip = release.assets.find((asset) => asset.name === zipName);
@@ -59,7 +86,8 @@ export async function generate(
         log(
           `[${githubRepo}](${release.name}) \"${zipName}\" Fetching zip file from ${zip.browser_download_url}`,
         );
-        zipSHA256 = await fetchZipSHA256(zip.browser_download_url);
+        const res = await fetchQueue.add(() => fetchZipSHA256(zip.browser_download_url));
+        if (res) zipSHA256 = res;
       }
       versions[pkg.version] = assertStrictPackage(
         zipSHA256
@@ -73,10 +101,10 @@ export async function generate(
               url: zip.browser_download_url,
             },
       );
-    }
-    if (!packageId) continue;
+    }));
+    if (!packageId) return;
     packages[packageId] = { versions };
-  }
+  }));
   return assertListing({
     id: source.id,
     name: source.name,
