@@ -1,7 +1,8 @@
-import type { Id } from "./CommonTypes/Id";
-import type { NonEmptyString } from "./CommonTypes/NonEmptyString";
-import type { Url } from "./CommonTypes/Url";
-import type { StrictPackage } from "./StrictPackage";
+import type { Id } from "./CommonTypes/Id.js";
+import type { NonEmptyString } from "./CommonTypes/NonEmptyString.js";
+import type { Url } from "./CommonTypes/Url.js";
+import type {Version} from "./CommonTypes/Version.js";
+import type { StrictPackage } from "./StrictPackage.js";
 
 export type Listing = {
   name: NonEmptyString;
@@ -11,7 +12,7 @@ export type Listing = {
   packages: {
     [K in Id]: {
       versions: {
-        [K in Id]: StrictPackage;
+        [K in Version]: StrictPackage;
       };
     };
   };
