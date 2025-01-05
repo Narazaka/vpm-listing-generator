@@ -27,6 +27,7 @@
     }
   },
   "sideEffects": false,
+  "files": ["dist"],
   "scripts": {
     "prepare": "ts-patch install && typia patch",
     "prepack": "npm run build",
