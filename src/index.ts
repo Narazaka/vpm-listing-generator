@@ -1,7 +1,7 @@
 import type { Octokit } from "octokit";
 import PQueue from "p-queue";
 import { type Listing, assertListing } from "./Listing.js";
-import { assertPackage } from "./Package.js";
+import { type Package, assertPackage } from "./Package.js";
 import { type Source, assertSource } from "./Source.js";
 import { assertStrictPackage } from "./StrictPackage.js";
 
@@ -31,11 +31,25 @@ export async function generate(
     logger?: (message: string) => unknown;
     /** fetch concurrency */
     concurrency?: number;
+    /** additional kv on version entry */
+    additionalOnVersion?: (context: {
+      package: Package;
+      release: PromiseValue<
+        ReturnType<ReturnType<typeof genFetchReleases>>
+      >[number];
+      addFetchQueue<T>(job: () => T): Promise<T>;
+    }) => Promise<Record<string, unknown>> | Record<string, unknown>;
   },
 ): Promise<Listing> {
   assertSource(source);
 
-  const { octokit, logger, calcSHA256 = true, concurrency = 5 } = options;
+  const {
+    octokit,
+    logger,
+    calcSHA256 = true,
+    concurrency = 5,
+    additionalOnVersion,
+  } = options;
   const log = logger ?? (() => {});
   const githubRepos = source.githubRepos ?? [];
   const packages: Listing["packages"] = {};
@@ -98,16 +112,25 @@ export async function generate(
             });
             if (res) zipSHA256 = res;
           }
+          const additional = additionalOnVersion
+            ? await additionalOnVersion({
+                package: pkg,
+                release,
+                addFetchQueue: fetchQueue.add,
+              })
+            : {};
           versions[pkg.version] = assertStrictPackage(
             zipSHA256
               ? {
                   ...pkg,
                   url: zip.browser_download_url,
                   zipSHA256,
+                  ...additional,
                 }
               : {
                   ...pkg,
                   url: zip.browser_download_url,
+                  ...additional,
                 },
           );
         }),
