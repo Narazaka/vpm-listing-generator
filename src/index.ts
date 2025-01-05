@@ -50,7 +50,7 @@ export async function generate(
     octokit,
     logger,
     calcSHA256 = true,
-    concurrency = 5,
+    concurrency = 6,
     additionalOnVersion,
   } = options;
   const log = logger ?? (() => {});
