@@ -17,6 +17,10 @@ function genFetchReleases(octokit: Octokit) {
   };
 }
 
+type Release = PromiseValue<
+  ReturnType<ReturnType<typeof genFetchReleases>>
+>[number];
+
 /** generate vpm repository listing json */
 export async function generate(
   /** source json */
@@ -35,9 +39,7 @@ export async function generate(
     additionalOnVersion?: (context: {
       githubRepo: string;
       package: Package;
-      release: PromiseValue<
-        ReturnType<ReturnType<typeof genFetchReleases>>
-      >[number];
+      release: Release;
       addFetchQueue<T>(job: () => T): Promise<T>;
     }) => Promise<Record<string, unknown>> | Record<string, unknown>;
   },
@@ -55,21 +57,21 @@ export async function generate(
   const githubRepos = source.githubRepos ?? [];
   const packages: Listing["packages"] = {};
 
+  const fetchQueue = new PQueue({ concurrency });
+
   const fetchReleases = genFetchReleases(octokit);
   const allReleases: {
-    [name: string]: PromiseValue<ReturnType<typeof fetchReleases>>;
+    [name: string]: Release[];
   } = {};
-  for (const githubRepo of githubRepos) {
-    log(`Fetching releases from [${githubRepo}]`);
-    const [owner, repo] = githubRepo.split("/");
-    const releases = await octokit.paginate(octokit.rest.repos.listReleases, {
-      owner,
-      repo,
-    });
-    allReleases[githubRepo] = releases;
-  }
-
-  const fetchQueue = new PQueue({ concurrency });
+  await Promise.all(
+    githubRepos.map(async (githubRepo) => {
+      const releases = (await fetchQueue.add(() => {
+        log(`Fetching releases from [${githubRepo}]`);
+        return fetchReleases(githubRepo);
+      })) as Release[];
+      allReleases[githubRepo] = releases;
+    }),
+  );
 
   await Promise.all(
     githubRepos.map(async (githubRepo) => {
