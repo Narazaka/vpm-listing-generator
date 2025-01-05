@@ -17,17 +17,25 @@ function genFetchReleases(octokit: Octokit) {
   };
 }
 
+/** generate vpm repository listing json */
 export async function generate(
+  /** source json */
   source: Source,
+  /** options */
   options: {
+    /** octokit to call Github API */
     octokit: Octokit;
+    /** generate zipSHA256 */
     calcSHA256?: boolean;
+    /** logger ex: console.log */
     logger?: (message: string) => unknown;
+    /** fetch concurrency */
+    concurrency?: number;
   },
 ): Promise<Listing> {
   assertSource(source);
 
-  const { octokit, logger, calcSHA256 = true } = options;
+  const { octokit, logger, calcSHA256 = true, concurrency = 5 } = options;
   const log = logger ?? (() => {});
   const githubRepos = source.githubRepos ?? [];
   const packages: Listing["packages"] = {};
@@ -46,7 +54,7 @@ export async function generate(
     allReleases[githubRepo] = releases;
   }
 
-  const fetchQueue = new PQueue({ concurrency: 5 });
+  const fetchQueue = new PQueue({ concurrency });
 
   await Promise.all(
     githubRepos.map(async (githubRepo) => {
