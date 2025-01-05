@@ -1,3 +1,4 @@
+import typia from "typia";
 import type { Id } from "./CommonTypes/Id.js";
 import type { NonEmptyString } from "./CommonTypes/NonEmptyString.js";
 import type { Url } from "./CommonTypes/Url.js";
@@ -17,3 +18,5 @@ export type Listing = {
     };
   };
 };
+
+export const assertListing = /*#__PURE__*/ typia.createAssert<Listing>();

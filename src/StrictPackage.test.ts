@@ -2,8 +2,6 @@ import typia from "typia";
 import { expect, test } from "vitest";
 import type { StrictPackage } from "./StrictPackage";
 
-const assertStrictPackage = /*#__PURE__*/ typia.createAssert<StrictPackage>();
-
 const packageJson = {
   name: "net.narazaka.unity.copy-assets-with-dependency",
   version: "1.0.0",

@@ -1,15 +1,9 @@
 import type { Octokit } from "octokit";
 import PQueue from "p-queue";
-import typia from "typia";
-import type { Listing } from "./Listing.js";
-import type { Package } from "./Package.js";
-import type { Source } from "./Source.js";
-import type { StrictPackage } from "./StrictPackage.js";
-
-const assertSource = /*#__PURE__*/ typia.createAssert<Source>();
-const assertPackage = /*#__PURE__*/ typia.createAssert<Package>();
-const assertStrictPackage = /*#__PURE__*/ typia.createAssert<StrictPackage>();
-const assertListing = /*#__PURE__*/ typia.createAssert<Listing>();
+import { type Listing, assertListing } from "./Listing.js";
+import { assertPackage } from "./Package.js";
+import { type Source, assertSource } from "./Source.js";
+import { assertStrictPackage } from "./StrictPackage.js";
 
 type PromiseValue<T> = T extends Promise<infer V> ? V : never;
 
