@@ -39,7 +39,7 @@
   "keywords": [],
   "author": "narazaka",
   "license": "Zlib",
-  "description": "",
+  "description": "VPM (VRChat Package Manager) repository listing JSON generator.",
   "engines": {
     "node": ">=18"
   },
