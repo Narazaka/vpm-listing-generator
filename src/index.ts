@@ -33,6 +33,7 @@ export async function generate(
     concurrency?: number;
     /** additional kv on version entry */
     additionalOnVersion?: (context: {
+      githubRepo: string;
       package: Package;
       release: PromiseValue<
         ReturnType<ReturnType<typeof genFetchReleases>>
@@ -114,6 +115,7 @@ export async function generate(
           }
           const additional = additionalOnVersion
             ? await additionalOnVersion({
+                githubRepo,
                 package: pkg,
                 release,
                 addFetchQueue: fetchQueue.add,
