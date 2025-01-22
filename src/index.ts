@@ -3,7 +3,7 @@ import PQueue from "p-queue";
 import { type Listing, assertListing } from "./Listing.js";
 import { type Package, assertPackage } from "./Package.js";
 import { type Source, assertSource } from "./Source.js";
-import { assertStrictPackage } from "./StrictPackage.js";
+import { assertStrictPackage, type StrictPackage } from "./StrictPackage.js";
 
 type PromiseValue<T> = T extends Promise<infer V> ? V : never;
 
@@ -35,6 +35,8 @@ export async function generate(
     logger?: (message: string) => unknown;
     /** fetch concurrency */
     concurrency?: number;
+    /** skip assert if false */
+    check?: boolean;
     /** additional kv on version entry */
     additionalOnVersion?: (context: {
       githubRepo: string;
@@ -44,15 +46,26 @@ export async function generate(
     }) => Promise<Record<string, unknown>> | Record<string, unknown>;
   },
 ): Promise<Listing> {
-  assertSource(source);
-
   const {
     octokit,
     logger,
     calcSHA256 = true,
     concurrency = 6,
     additionalOnVersion,
+    check = true,
   } = options;
+
+  async function fetchPackageJson(url: string) {
+    const res = await fetch(url, { redirect: "follow" });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch package.json from ${url}`);
+    }
+    const json = (await res.json()) as Package;
+    return check ? assertPackage(json) : json;
+  }
+
+  if (check) assertSource(source);
+
   const log = logger ?? (() => {});
   const githubRepos = source.githubRepos ?? [];
   const packages: Listing["packages"] = {};
@@ -123,41 +136,35 @@ export async function generate(
                 addFetchQueue: fetchQueue.add,
               })
             : {};
-          versions[pkg.version] = assertStrictPackage(
-            zipSHA256
-              ? {
-                  ...pkg,
-                  url: zip.browser_download_url,
-                  zipSHA256,
-                  ...additional,
-                }
-              : {
-                  ...pkg,
-                  url: zip.browser_download_url,
-                  ...additional,
-                },
-          );
+          const strictPackage: StrictPackage = zipSHA256
+            ? {
+                ...pkg,
+                url: zip.browser_download_url,
+                zipSHA256,
+                ...additional,
+              }
+            : {
+                ...pkg,
+                url: zip.browser_download_url,
+                ...additional,
+              };
+          versions[pkg.version] = check
+            ? assertStrictPackage(strictPackage)
+            : strictPackage;
         }),
       );
       if (!packageId) return;
       packages[packageId] = { versions };
     }),
   );
-  return assertListing({
+  const listing: Listing = {
     id: source.id,
     name: source.name,
     author: source.author.name,
     url: source.url,
     packages,
-  });
-}
-
-async function fetchPackageJson(url: string) {
-  const res = await fetch(url, { redirect: "follow" });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch package.json from ${url}`);
-  }
-  return assertPackage(await res.json());
+  };
+  return check ? assertListing(listing) : listing;
 }
 
 async function fetchZipSHA256(url: string) {

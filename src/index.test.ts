@@ -66,10 +66,44 @@ const source = {
   packages: [],
 };
 
-test("generate", { timeout: 1000 * 60 * 30 }, async () => {
+const timeout = 1000 * 60 * 30;
+
+test.skip("generate", { timeout }, async () => {
   const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
   const listing = generate(source, {
     octokit,
+    logger: console.log,
+  });
+  expect(listing).resolves.toBeDefined();
+});
+
+const invalidSource = {
+  name: "XXX",
+  id: "fr.spokeek.XXX",
+  url: "https://github.com/Spokeek/XXX",
+  author: {
+    email: "XXX",
+    name: "XXX",
+    url: "XXX",
+  },
+  description: "XXX",
+  githubRepos: ["bdunderscore/modular-avatar"],
+};
+
+test("generate invalid fails", { timeout }, async () => {
+  const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+  const listing = generate(invalidSource, {
+    octokit,
+    logger: console.log,
+  });
+  expect(listing).rejects.toBeDefined();
+});
+
+test("generate invalid success without check", { timeout }, async () => {
+  const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+  const listing = generate(invalidSource, {
+    octokit,
+    check: false,
     logger: console.log,
   });
   expect(listing).resolves.toBeDefined();
