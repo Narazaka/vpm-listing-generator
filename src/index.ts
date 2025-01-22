@@ -3,7 +3,7 @@ import PQueue from "p-queue";
 import { type Listing, assertListing } from "./Listing.js";
 import { type Package, assertPackage } from "./Package.js";
 import { type Source, assertSource } from "./Source.js";
-import { assertStrictPackage, type StrictPackage } from "./StrictPackage.js";
+import { type StrictPackage, assertStrictPackage } from "./StrictPackage.js";
 
 type PromiseValue<T> = T extends Promise<infer V> ? V : never;
 
