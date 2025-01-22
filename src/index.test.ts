@@ -74,7 +74,7 @@ test("generate", { timeout }, async () => {
     octokit,
     logger: console.log,
   });
-  expect(listing).resolves.toBeDefined();
+  await expect(listing).resolves.toBeDefined();
 });
 
 const invalidSource = {
@@ -96,7 +96,7 @@ test("generate invalid fails", { timeout }, async () => {
     octokit,
     logger: console.log,
   });
-  expect(listing).rejects.toBeDefined();
+  await expect(listing).rejects.toBeDefined();
 });
 
 test("generate invalid success without check", { timeout }, async () => {
@@ -106,5 +106,5 @@ test("generate invalid success without check", { timeout }, async () => {
     check: false,
     logger: console.log,
   });
-  expect(listing).resolves.toBeDefined();
+  await expect(listing).resolves.toBeDefined();
 });
