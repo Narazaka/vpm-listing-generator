@@ -68,7 +68,7 @@ const source = {
 
 const timeout = 1000 * 60 * 30;
 
-test.skip("generate", { timeout }, async () => {
+test("generate", { timeout }, async () => {
   const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
   const listing = generate(source, {
     octokit,
