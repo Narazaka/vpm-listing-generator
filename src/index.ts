@@ -23,6 +23,22 @@ type Release = PromiseValue<
   ReturnType<ReturnType<typeof genFetchReleases>>
 >[number];
 
+export type DelayFunction = (
+  attempt: number,
+  error: Error | null,
+  response: Response | null,
+) => number;
+
+export type DelayOption = number | DelayFunction;
+
+export type RetryOnFunction = (
+  attempt: number,
+  error: Error | null,
+  response: Response | null,
+) => boolean | Promise<boolean>;
+
+export type RetryOnOption = number[] | RetryOnFunction;
+
 /** generate vpm repository listing json */
 export async function generate(
   /** source json */
@@ -40,20 +56,8 @@ export async function generate(
     /** skip assert if false */
     check?: boolean;
     retries?: number;
-    retryDelay?:
-      | number
-      | ((
-          attempt: number,
-          error: Error | null,
-          response: Response | null,
-        ) => number);
-    retryOn?:
-      | number[]
-      | ((
-          attempt: number,
-          error: Error | null,
-          response: Response | null,
-        ) => boolean | Promise<boolean>);
+    retryDelay?: DelayOption;
+    retryOn?: RetryOnOption;
     /** additional kv on version entry */
     additionalOnVersion?: (context: {
       githubRepo: string;
