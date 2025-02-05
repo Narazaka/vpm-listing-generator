@@ -4,6 +4,8 @@ import { type Listing, assertListing } from "./Listing.js";
 import { type Package, assertPackage } from "./Package.js";
 import { type Source, assertSource } from "./Source.js";
 import { type StrictPackage, assertStrictPackage } from "./StrictPackage.js";
+import fetchBuilder from "fetch-retry";
+const fetch = fetchBuilder(globalThis.fetch);
 
 type PromiseValue<T> = T extends Promise<infer V> ? V : never;
 
@@ -37,6 +39,21 @@ export async function generate(
     concurrency?: number;
     /** skip assert if false */
     check?: boolean;
+    retries?: number;
+    retryDelay?:
+      | number
+      | ((
+          attempt: number,
+          error: Error | null,
+          response: Response | null,
+        ) => number);
+    retryOn?:
+      | number[]
+      | ((
+          attempt: number,
+          error: Error | null,
+          response: Response | null,
+        ) => boolean | Promise<boolean>);
     /** additional kv on version entry */
     additionalOnVersion?: (context: {
       githubRepo: string;
@@ -53,15 +70,40 @@ export async function generate(
     concurrency = 6,
     additionalOnVersion,
     check = true,
+    retries = 3,
+    retryDelay = (attempt) => 2 ** attempt * 1000,
+    retryOn,
   } = options;
 
   async function fetchPackageJson(url: string) {
-    const res = await fetch(url, { redirect: "follow" });
+    const res = await fetch(url, {
+      redirect: "follow",
+      retries,
+      retryDelay,
+      retryOn,
+    });
     if (!res.ok) {
       throw new Error(`Failed to fetch package.json from ${url}`);
     }
     const json = (await res.json()) as Package;
     return check ? assertPackage(json) : json;
+  }
+
+  async function fetchZipSHA256(url: string) {
+    const res = await fetch(url, {
+      redirect: "follow",
+      retries,
+      retryDelay,
+      retryOn,
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch zip file from ${url}`);
+    }
+    const buffer = await res.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   if (check) assertSource(source);
@@ -165,16 +207,4 @@ export async function generate(
     packages,
   };
   return check ? assertListing(listing) : listing;
-}
-
-async function fetchZipSHA256(url: string) {
-  const res = await fetch(url, { redirect: "follow" });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch zip file from ${url}`);
-  }
-  const buffer = await res.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
