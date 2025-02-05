@@ -23,13 +23,13 @@ type Release = PromiseValue<
   ReturnType<ReturnType<typeof genFetchReleases>>
 >[number];
 
-export type DelayFunction = (
+export type RetryDelayFunction = (
   attempt: number,
   error: Error | null,
   response: Response | null,
 ) => number;
 
-export type DelayOption = number | DelayFunction;
+export type RetryDelayOption = number | RetryDelayFunction;
 
 export type RetryOnFunction = (
   attempt: number,
@@ -56,7 +56,7 @@ export async function generate(
     /** skip assert if false */
     check?: boolean;
     retries?: number;
-    retryDelay?: DelayOption;
+    retryDelay?: RetryDelayOption;
     retryOn?: RetryOnOption;
     /** additional kv on version entry */
     additionalOnVersion?: (context: {
