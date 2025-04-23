@@ -1,6 +1,6 @@
 {
   "name": "vpm-listing-generator",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -27,9 +27,7 @@
     }
   },
   "sideEffects": false,
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "prepare": "ts-patch install && typia patch",
     "prepack": "npm run build",
@@ -40,11 +38,7 @@
     "test:watch": "vitest",
     "doc": "typedoc"
   },
-  "keywords": [
-    "vrchat",
-    "vpm",
-    "vcc"
-  ],
+  "keywords": ["vrchat", "vpm", "vcc"],
   "author": "narazaka",
   "license": "Zlib",
   "description": "VPM (VRChat Package Manager) repository listing JSON generator.",
