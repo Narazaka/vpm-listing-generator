@@ -51,8 +51,10 @@ export async function generate(
     calcSHA256?: boolean;
     /** logger ex: console.log */
     logger?: (message: string) => unknown;
-    /** fetch concurrency */
+    /** fetch ZIP concurrency */
     concurrency?: number;
+    /** fetch Github API concurrency */
+    apiConcurrency?: number;
     /** skip assert if false */
     check?: boolean;
     retries?: number;
@@ -72,6 +74,7 @@ export async function generate(
     logger,
     calcSHA256 = true,
     concurrency = 6,
+    apiConcurrency = 3,
     additionalOnVersion,
     check = true,
     retries = 3,
@@ -117,6 +120,7 @@ export async function generate(
   const packages: Listing["packages"] = {};
 
   const fetchQueue = new PQueue({ concurrency });
+  const fetchApiQueue = new PQueue({ concurrency: apiConcurrency });
 
   const fetchReleases = genFetchReleases(octokit);
   const allReleases: {
@@ -124,7 +128,7 @@ export async function generate(
   } = {};
   await Promise.all(
     githubRepos.map(async (githubRepo) => {
-      const releases = (await fetchQueue.add(() => {
+      const releases = (await fetchApiQueue.add(() => {
         log(`Fetching releases from [${githubRepo}]`);
         return fetchReleases(githubRepo);
       })) as Release[];
