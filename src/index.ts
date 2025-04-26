@@ -15,6 +15,7 @@ function genFetchReleases(octokit: Octokit) {
     return octokit.paginate(octokit.rest.repos.listReleases, {
       owner,
       repo,
+      per_page: 100,
     });
   };
 }
