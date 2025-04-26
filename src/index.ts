@@ -105,7 +105,7 @@ export async function generate(
       retryOn,
     });
     if (!res.ok) {
-      throw new Error(`Failed to fetch zip file from ${url}`);
+      throw new Error(`[${res.status}] Failed to fetch zip file from ${url}`);
     }
     const buffer = await res.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
