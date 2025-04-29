@@ -91,7 +91,9 @@ export async function generate(
       retryOn,
     });
     if (!res.ok) {
-      throw new Error(`Failed to fetch package.json from ${url}`);
+      throw new Error(
+        `[${res.status}] Failed to fetch package.json from ${url}`,
+      );
     }
     const json = (await res.json()) as Package;
     return check ? assertPackage(json) : json;
