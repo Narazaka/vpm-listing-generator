@@ -78,7 +78,7 @@ export async function generate(
     apiConcurrency = 3,
     additionalOnVersion,
     check = true,
-    retries = 3,
+    retries = 6,
     retryDelay = (attempt) => 2 ** attempt * 1000,
     retryOn = [400, 403, 408, 429, 500, 503, 504, 618],
   } = options;
