@@ -72,7 +72,7 @@ export async function generate(
     logger,
     calcSHA256 = true,
     concurrency = 6,
-    apiBatchRepositorySize = 60,
+    apiBatchRepositorySize = 20,
     additionalOnVersion,
     check = true,
     retries = 6,
