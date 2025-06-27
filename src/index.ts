@@ -75,7 +75,7 @@ export async function generate(
     logger,
     calcSHA256 = true,
     concurrency = 6,
-    apiConcurrency = 3,
+    apiConcurrency = 1,
     additionalOnVersion,
     check = true,
     retries = 6,
