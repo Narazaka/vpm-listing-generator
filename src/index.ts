@@ -5,24 +5,19 @@ import { type Package, assertPackage } from "./Package.js";
 import { type Source, assertSource } from "./Source.js";
 import { type StrictPackage, assertStrictPackage } from "./StrictPackage.js";
 import fetchBuilder from "fetch-retry";
+import type { GqlResponse } from "./GqlTypes.js";
 const fetch = fetchBuilder(globalThis.fetch);
 
-type PromiseValue<T> = T extends Promise<infer V> ? V : never;
-
-function genFetchReleases(octokit: Octokit) {
-  return function fetchReleases(githubRepo: string) {
-    const [owner, repo] = githubRepo.split("/");
-    return octokit.paginate(octokit.rest.repos.listReleases, {
-      owner,
-      repo,
-      per_page: 100,
-    });
-  };
-}
-
-type Release = PromiseValue<
-  ReturnType<ReturnType<typeof genFetchReleases>>
->[number];
+// The old Release type was based on the REST API.
+// We create a new compatible type for the processing loop.
+type Release = {
+  name: string;
+  tag_name: string;
+  assets: {
+    name: string;
+    browser_download_url: string;
+  }[];
+};
 
 export type RetryDelayFunction = (
   attempt: number,
@@ -54,7 +49,7 @@ export async function generate(
     logger?: (message: string) => unknown;
     /** fetch ZIP concurrency */
     concurrency?: number;
-    /** fetch Github API concurrency */
+    /** @deprecated Not used anymore since switching to batched GraphQL queries. */
     apiConcurrency?: number;
     /** skip assert if false */
     check?: boolean;
@@ -75,7 +70,6 @@ export async function generate(
     logger,
     calcSHA256 = true,
     concurrency = 6,
-    apiConcurrency = 3,
     additionalOnVersion,
     check = true,
     retries = 6,
@@ -123,21 +117,76 @@ export async function generate(
   const packages: Listing["packages"] = {};
 
   const fetchQueue = new PQueue({ concurrency });
-  const fetchApiQueue = new PQueue({ concurrency: apiConcurrency });
 
-  const fetchReleases = genFetchReleases(octokit);
   const allReleases: {
     [name: string]: Release[];
   } = {};
-  await Promise.all(
-    githubRepos.map(async (githubRepo) => {
-      const releases = (await fetchApiQueue.add(() => {
-        log(`Fetching releases from [${githubRepo}]`);
-        return fetchReleases(githubRepo);
-      })) as Release[];
-      allReleases[githubRepo] = releases;
-    }),
+  for (const repo of githubRepos) {
+    allReleases[repo] = [];
+  }
+
+  let reposToFetch: { name: string; cursor: string | null }[] = githubRepos.map(
+    (repo) => ({ name: repo, cursor: null }),
   );
+
+  while (reposToFetch.length > 0) {
+    const queryFragments = reposToFetch.map(({ name, cursor }, i) => {
+      const [owner, repo] = name.split("/");
+      const after = cursor ? `, after: "${cursor}"` : "";
+      return `
+        repo_${i}: repository(owner: "${owner}", name: "${repo}") {
+          releases(first: 100, orderBy: {field: CREATED_AT, direction: DESC}${after}) {
+            nodes {
+              name
+              tagName
+              releaseAssets(first: 100) {
+                nodes {
+                  name
+                  downloadUrl
+                }
+              }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }`;
+    });
+
+    const query = `query {\n${queryFragments.join("\n")}\n}`;
+
+    log(`Fetching releases for ${reposToFetch.length} repositories.`);
+    const gqlResponse = (await octokit.graphql(query)) as GqlResponse;
+
+    const nextReposToFetch: { name: string; cursor: string | null }[] = [];
+    for (let i = 0; i < reposToFetch.length; i++) {
+      const repoName = reposToFetch[i].name;
+      const repoData = gqlResponse[`repo_${i}`];
+      if (!repoData) {
+        log(`[${repoName}] No data returned from GraphQL.`);
+        continue;
+      }
+
+      const releases = repoData.releases.nodes.map((release) => ({
+        name: release.name,
+        tag_name: release.tagName,
+        assets: release.releaseAssets.nodes.map((asset) => ({
+          name: asset.name,
+          browser_download_url: asset.downloadUrl,
+        })),
+      }));
+      allReleases[repoName].push(...releases);
+
+      if (repoData.releases.pageInfo.hasNextPage) {
+        nextReposToFetch.push({
+          name: repoName,
+          cursor: repoData.releases.pageInfo.endCursor,
+        });
+      }
+    }
+    reposToFetch = nextReposToFetch;
+  }
 
   await Promise.all(
     githubRepos.map(async (githubRepo) => {
