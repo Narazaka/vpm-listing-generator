@@ -51,6 +51,8 @@ export async function generate(
     concurrency?: number;
     /** @deprecated Not used anymore since switching to batched GraphQL queries. */
     apiConcurrency?: number;
+    /** GraphQL API fetch repo batch size */
+    apiBatchRepositorySize?: number;
     /** skip assert if false */
     check?: boolean;
     retries?: number;
@@ -70,6 +72,7 @@ export async function generate(
     logger,
     calcSHA256 = true,
     concurrency = 6,
+    apiBatchRepositorySize = 10,
     additionalOnVersion,
     check = true,
     retries = 6,
@@ -125,15 +128,17 @@ export async function generate(
     allReleases[repo] = [];
   }
 
-  let reposToFetch: { name: string; cursor: string | null }[] = githubRepos.map(
-    (repo) => ({ name: repo, cursor: null }),
-  );
+  for (let i = 0; i < githubRepos.length; i += apiBatchRepositorySize) {
+    const chunk = githubRepos.slice(i, i + apiBatchRepositorySize);
+    let reposToFetch: { name: string; cursor: string | null }[] = chunk.map(
+      (repo) => ({ name: repo, cursor: null }),
+    );
 
-  while (reposToFetch.length > 0) {
-    const queryFragments = reposToFetch.map(({ name, cursor }, i) => {
-      const [owner, repo] = name.split("/");
-      const after = cursor ? `, after: "${cursor}"` : "";
-      return `
+    while (reposToFetch.length > 0) {
+      const queryFragments = reposToFetch.map(({ name, cursor }, i) => {
+        const [owner, repo] = name.split("/");
+        const after = cursor ? `, after: "${cursor}"` : "";
+        return `
         repo_${i}: repository(owner: "${owner}", name: "${repo}") {
           releases(first: 100, orderBy: {field: CREATED_AT, direction: DESC}${after}) {
             nodes {
@@ -152,40 +157,41 @@ export async function generate(
             }
           }
         }`;
-    });
+      });
 
-    const query = `query {\n${queryFragments.join("\n")}\n}`;
+      const query = `query {\n${queryFragments.join("\n")}\n}`;
 
-    log(`Fetching releases for ${reposToFetch.length} repositories.`);
-    const gqlResponse = (await octokit.graphql(query)) as GqlResponse;
+      log(`Fetching releases for ${reposToFetch.length} repositories.`);
+      const gqlResponse = (await octokit.graphql(query)) as GqlResponse;
 
-    const nextReposToFetch: { name: string; cursor: string | null }[] = [];
-    for (let i = 0; i < reposToFetch.length; i++) {
-      const repoName = reposToFetch[i].name;
-      const repoData = gqlResponse[`repo_${i}`];
-      if (!repoData) {
-        log(`[${repoName}] No data returned from GraphQL.`);
-        continue;
+      const nextReposToFetch: { name: string; cursor: string | null }[] = [];
+      for (let i = 0; i < reposToFetch.length; i++) {
+        const repoName = reposToFetch[i].name;
+        const repoData = gqlResponse[`repo_${i}`];
+        if (!repoData) {
+          log(`[${repoName}] No data returned from GraphQL.`);
+          continue;
+        }
+
+        const releases = repoData.releases.nodes.map((release) => ({
+          name: release.name,
+          tag_name: release.tagName,
+          assets: release.releaseAssets.nodes.map((asset) => ({
+            name: asset.name,
+            browser_download_url: asset.downloadUrl,
+          })),
+        }));
+        allReleases[repoName].push(...releases);
+
+        if (repoData.releases.pageInfo.hasNextPage) {
+          nextReposToFetch.push({
+            name: repoName,
+            cursor: repoData.releases.pageInfo.endCursor,
+          });
+        }
       }
-
-      const releases = repoData.releases.nodes.map((release) => ({
-        name: release.name,
-        tag_name: release.tagName,
-        assets: release.releaseAssets.nodes.map((asset) => ({
-          name: asset.name,
-          browser_download_url: asset.downloadUrl,
-        })),
-      }));
-      allReleases[repoName].push(...releases);
-
-      if (repoData.releases.pageInfo.hasNextPage) {
-        nextReposToFetch.push({
-          name: repoName,
-          cursor: repoData.releases.pageInfo.endCursor,
-        });
-      }
+      reposToFetch = nextReposToFetch;
     }
-    reposToFetch = nextReposToFetch;
   }
 
   await Promise.all(
