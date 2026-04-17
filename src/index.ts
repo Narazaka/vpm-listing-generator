@@ -1,11 +1,11 @@
+import fetchBuilder from "fetch-retry";
 import type { Octokit } from "octokit";
 import PQueue from "p-queue";
+import type { GqlResponse } from "./GqlTypes.js";
 import { type Listing, assertListing } from "./Listing.js";
 import { type Package, assertPackage } from "./Package.js";
 import { type Source, assertSource } from "./Source.js";
 import { type StrictPackage, assertStrictPackage } from "./StrictPackage.js";
-import fetchBuilder from "fetch-retry";
-import type { GqlResponse } from "./GqlTypes.js";
 const fetch = fetchBuilder(globalThis.fetch);
 
 // The old Release type was based on the REST API.
@@ -197,8 +197,7 @@ export async function generate(
   await Promise.all(
     githubRepos.map(async (githubRepo) => {
       const releases = allReleases[githubRepo];
-      let packageId = "";
-      const versions: Listing["packages"][string]["versions"] = {};
+      const repoPackages: Listing["packages"] = {};
       await Promise.all(
         releases.map(async (release) => {
           const packageJson = release.assets.find(
@@ -218,7 +217,6 @@ export async function generate(
             return fetchPackageJson(packageJson.browser_download_url);
           });
           if (!pkg) throw new Error("Failed to fetch package.json");
-          packageId = pkg.name;
           const zipName = `${pkg.name}-${pkg.version}.zip`;
           const zip = release.assets.find((asset) => asset.name === zipName);
           if (!zip) {
@@ -256,13 +254,23 @@ export async function generate(
                 url: zip.browser_download_url,
                 ...additional,
               };
-          versions[pkg.version] = check
+          if (!repoPackages[pkg.name])
+            repoPackages[pkg.name] = { versions: {} };
+          repoPackages[pkg.name].versions[pkg.version] = check
             ? assertStrictPackage(strictPackage)
             : strictPackage;
         }),
       );
-      if (!packageId) return;
-      packages[packageId] = { versions };
+      for (const [id, data] of Object.entries(repoPackages)) {
+        if (packages[id]) {
+          packages[id].versions = {
+            ...packages[id].versions,
+            ...data.versions,
+          };
+        } else {
+          packages[id] = data;
+        }
+      }
     }),
   );
   const listing: Listing = {
