@@ -77,7 +77,7 @@ export async function generate(
     check = true,
     retries = 6,
     retryDelay = (attempt) => 2 ** attempt * 1000,
-    retryOn = [400, 403, 408, 429, 500, 503, 504, 618],
+    retryOn = [400, 403, 408, 429, 500, 502, 503, 504, 618],
   } = options;
 
   async function fetchPackageJson(url: string) {
